@@ -1,0 +1,20 @@
+# User settings for the ultrasound air image analysis:
+path_data: 'data'                                             # Directory location for analysis data
+path_save: 'results'                                          # Directory location for storing results
+file_name: 'data1.dcm'
+
+auto_suffix: False
+circle_fitfrac: !!float 0.33333333
+cluster_fminsize: !!int 300
+cluster_mode: 'all_middle'
+f_dead: !!float 0.3
+f_weak: !!float 0.5
+vcor_px: !!int 0
+hcor_px: !!int 0
+init_x0x1: [37, 830]
+init_y0y1: [90, 400]
+x0y0x1y1: !!null None
+signal_thresh: !!float 0
+curve_radii_px: !!null None
+curve_origin_px: !!null None
+curve_angles_deg: !!null None
