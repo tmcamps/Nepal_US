@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 
 path = os.getcwd()                                                      # Get the current working directory of a process
-settings_file = '../meta_data.yaml'  # Name of file with preset settings
+settings_file = '../settings/meta_data.yaml'  # Name of file with preset settings
 path_settings = os.path.join(path, settings_file)                       # Get directory of settings file
 meta_data = yaml.load(open(path_settings), Loader=yaml.FullLoader)   # Load user settings from yaml file as dictionary
 
@@ -36,7 +36,7 @@ params = {'auto_suffix': False,
 
 #%% Prepare input
 
-path = 'C:\\Users\\tokec\\PycharmProjects\\Nepal_US\\analysis\\'                                                     # Get the current working directory of a process
+path = '/analysis\\'  # Get the current working directory of a process
 settings_file = 'settings_data2.yaml'                                         # Name of file with preset settings
 path_settings = os.path.join(path, settings_file)                       # Get directory of settings file
 settings_dct = yaml.load(open(path_settings), Loader=yaml.FullLoader)   # Load user settings from yaml file as dictionary

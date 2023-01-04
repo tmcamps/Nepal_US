@@ -2,25 +2,20 @@ import os
 import numpy as np
 import scipy.ndimage as scind
 from PIL import Image
-from PIL import ImageDraw # imagedraw from pillow is needed, not pil
 import operator
-import matplotlib.pyplot as plt
-from openpyxl import Workbook, load_workbook
-from scipy import stats
-from sklearn import preprocessing
-from scipy.signal import argrelextrema
 from scipy.signal import find_peaks
 
-from utils_analysis_new import fit_circle, initialize_data, analysis_helper, visualizations
-helper = analysis_helper()
-visualize = visualizations()
+from analysis.utilizations import fit_circle, initialize_data, util_analysis, visualizations
+
+helper = util_analysis.analysis_helper()
+visualize = visualizations.visualizations()
 
 
 class analysis:
     def __init__(self, settings, metadata):
 
         # Step 1: initialize data and dictionary
-        init = initialize_data(settings, metadata)
+        init = initialize_data.initialize_data(settings, metadata)
         init.run()
 
         self.meta_data = init.meta_data
@@ -186,7 +181,7 @@ class analysis:
         cf_fraction = circ_xy[int(fraction * len(circ_xy)):]  # Create circle of only central part
 
         # Fit the fractionated circle: calculate optimized center of circle and determine radius of the circle
-        cf = fit_circle(cf_fraction)
+        cf = fit_circle.fit_circle(cf_fraction)
         (x_center, y_center), R = cf.circ_fit()
 
         # Calculate the limiting curvature of the circle at left side and right side in rad
@@ -454,143 +449,3 @@ class analysis:
 
         '''Step 4: Create final report of the analysis'''
 
-
-#%%
-qc = analysis('settings_data2.yaml', 'meta_data.yaml')
-
-#%%
-qc.run()
-
-# #%%
-# profile = qc.hori_profile
-# # width_px = np.array(list(range(len(profile))))
-# #
-# # mean = qc.mean
-# # weak = qc.weak
-# dead = qc.dead
-#
-# dead_idx = sorted(np.where(profile < dead)[0])
-#
-# dead_idx = np.ma.masked_where(profile > dead, profile)
-# weak_idx = np.ma.masked_where((profile > weak), profile)
-# weak_idx = np.ma.masked_where((profile < dead), weak_idx)
-# normal_idx = np.ma.masked_where(profile < weak, profile)
-#
-# # Plot the profile
-# plt.figure()
-# plt.plot(width_px, weak_idx,
-#          color='red',
-#          label='dead elements')
-#
-# plt.show()
-# ax1.plot(width_px, weak_idx,
-#          color='orange',
-#          label='weak elements')
-# ax1.plot(width_px, normal_idx,
-#          color='green',
-#          label='functioning elements')
-
-#%%
-#
-# #%%
-# init = initialize_data('settings_data2.yaml', 'meta_data.yaml')
-# init.run()
-#
-# #%%
-# pal = np.arange(0, 256, 1, dtype=np.uint8)[:, np.newaxis] * \
-#       np.ones((3,), dtype=np.uint8)[np.newaxis, :]
-# # but reserve the first for red for markings
-# pal[0] = [255, 0, 0]
-#
-# temp = np.array(image)
-# temp[image == 0] = 1  # Set lowest value to 1
-# im = Image.fromarray(temp, mode='L')
-# im.putpalette(pal)
-#
-# #%%
-# polyrois = []
-# curve_roi = []
-# ang0, ang1 = qc.params['pt_curve_angles_deg'] #Rc, maxrad
-# r0, r1 = qc.params['pt_curve_radii_px']
-# xc, yc, rc = qc.params['pt_curve_origin_px']  # [xc,yc,Rc]
-#
-# #%%
-# x0, y0, x1, y1 = qc.params['us_x0y0x1y1']
-#
-# for ang in np.linspace(ang0, ang1, num=x1 - x0, endpoint=True):
-#     x = xc + r0 * np.sin(np.pi / 180. * ang)
-#     y = yc + r0 * np.cos(np.pi / 180. * ang)
-#     curve_roi.append((x, y))
-# for ang in np.linspace(ang1, ang0, num=x1 - x0, endpoint=True):
-#     x = xc + r1 * np.sin(np.pi / 180. * ang)
-#     y = yc + r1 * np.cos(np.pi / 180. * ang)
-#     curve_roi.append((x, y))
-# polyrois.append(curve_roi)
-#
-# #%%
-# draw = ImageDraw.Draw(im)
-# for r in polyrois:
-#     # [ [ (x,y) ] ]
-#     roi = []
-#     for x, y in r:
-#         roi.append((int(x + .5), int(y + .5)))
-#     draw.polygon(roi, outline=0)
-
-# #%%
-# rectrois = []
-# x0,y0,x1,y1 = qc.params['us_x0y0x1y1']
-# y1 = 59 + 5
-# x0 = 1
-# y0 = 1
-#
-# rectrois.append( [(x0, y0),(x1, y1)] )
-#
-# #%%
-# draw = ImageDraw.Draw(im)
-# for r in rectrois:
-#     # [ (x0,y0),(x1,y1) ]
-#     (x0, y0), (x1, y1) = r
-#     draw.rectangle(((x0, y0), (x1, y1)), outline=0)
-
-
-
-# init = initialize_data('settings_data1.yaml', 'meta_data.yaml')
-# init.run()
-# im, im_crop = qc.run()
-
-
-#%%
-# im_norm = helper.normalize(im_crop)
-# plt.figure()
-# plt.imshow(qc.im, cmap='gray', vmin=0, vmax=255)
-# plt.show()
-#
-# #%%
-# vertical_profile = np.average(im_norm, axis=1)
-# vertical_profile = helper.normalize(vertical_profile)
-#
-# window_size = 5
-# vertical_profile_smooth = helper.smooth(vertical_profile, window_size)
-# peaks = find_peaks(vertical_profile_smooth)
-# peaks = peaks[0]
-#
-# #%%
-# x_values = np.array(list(range(len(im))))
-# peak_line = np.zeros(peaks.)
-# for i in range(peaks.shape[0]):
-#     peak_lines[i] = np.ones(x.shape[0]) * peaks[i]
-# x_lines = np.concatenate()
-#
-# #%%
-# x_values = np.array(list(range(im.shape[1])))
-# peak_line = np.ones(x_values.shape[0]) * peaks[4]
-#
-# #%%
-# plt.imshow(im, cmap='gray', vmin=0, vmax=255)
-#
-# #%%
-# plt.plot(x_values, peak_line, 'r')
-#
-# #%%
-# plt.show()
-#
