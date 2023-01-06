@@ -1,8 +1,8 @@
 # User settings for the ultrasound air image analysis:
 path_data: 'data'                                             # Directory location for analysis data
 path_save: 'results'                                          # Directory location for storing results
-file_name: 'data2.dcm'
-meta_data_name: 'meta_data.yaml'
+file_name: 'thumbnail.bmp'
+meta_data_name: 'DcmRegionPara.txt'
 
 auto_suffix: False
 circle_fitfrac: !!float 0.33333333
@@ -10,14 +10,21 @@ cluster_fminsize: !!int 300
 f_dead: !!float 0.3
 f_weak: !!float 0.5
 vcor_px: !!int 0
-hcor_px: !!int 0
-init_x0x1: [60, 790]
-init_y0y1: [90, 150]
+hcor_px: 0
 x0y0x1y1: !!null None
+init_x0x1: !!null None
+init_y0y1: [150, 890]
 signal_thresh: !!float 0
 curve_radii_px: !!null None
 curve_origin_px: !!null None
 curve_angles_deg: !!null None
 crop_depth: !!int 100
 window: !!int 5
-normalize_mode: 'normal'
+normalize_mode: !!null None #'median'
+
+# Meta_data variable names:
+transducer_type: 'strProbeName'
+Phys_units_X: 'PhyUnitsX'
+Phys_units_Y: 'PhyUnitsY'
+Phys_delta_X: 'PhyDeltaX'
+Phys_delta_Y: 'PhyDeltaY'

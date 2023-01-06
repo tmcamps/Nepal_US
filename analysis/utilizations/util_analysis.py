@@ -42,7 +42,7 @@ class analysis_helper:
 
         return labels_middle
 
-    def crop_image(self, im_segment, edges, mask):
+    def crop_image(self, im_segment, edges):
         """
         Function to crop the image to a box containing only data
         """
@@ -50,8 +50,6 @@ class analysis_helper:
         x0, y0, x1, y1 = edges
 
         # # Define pixels to skip for left and right (hcor_px) and above and below (vcor_px)
-        # dx = self.params['hcor_px']
-        # dy = self.params['vcor_px']
         dx = 0
         dy = 0
 
@@ -67,7 +65,10 @@ class analysis_helper:
         h, w = data.shape
 
         pixels_middle = max(0, min(int(w * .3 + .5), w - 1))
-        im_sens = data[:, pixels_middle:-pixels_middle]
+
+        # If defined also crop a few pixels from the upper part of the image
+        dy = 0
+        im_sens = data[dy:, pixels_middle:-pixels_middle]
 
         return im_sens
 
@@ -133,6 +134,13 @@ class analysis_helper:
         Function to normalize data
         """
         return (data - data.min())/ (data.max() - data.min())
+
+    def normalize_mean(self, data):
+        """
+        Function to normalize data by average
+        """
+        norm = (data - data.mean()) / (data.max() - data.min())
+        return norm
 
     def smooth(self, data, window_size):
         window = np.ones(window_size) / window_size
