@@ -4,7 +4,22 @@ import operator
 from PIL import Image
 
 class analysis_helper:
-    def remove_small_cluster(self, cca, labels, BW, qc):
+    def remove_small_cluster(self, BW):
+        BW = BW.astype('int')
+        kernel = scind.generate_binary_structure(2,1)
+
+        # Perform closing to fill holes in ultrasound region where signal is low
+        BW_closing = scind.binary_closing(BW, structure=kernel).astype(np.int)
+
+        # Select only largest component = ultrasound region; remove small clusters
+        cca, labels = scind.label(BW_closing)
+        cluster_size = scind.sum(BW_closing, cca, range(labels + 1))
+        loc = np.argmax(cluster_size)
+        BW_closing = cca == loc
+
+        return BW_closing
+
+    def remove_small_cluster_old(self, cca, labels, BW, qc):
         # Determine size of image
         h, w = np.shape(cca)
 
@@ -137,10 +152,11 @@ class analysis_helper:
 
     def normalize_mean(self, data):
         """
-        Function to normalize data by average
+        Function to normalize data by average; add 1 to center around 1
         """
         norm = (data - data.mean()) / (data.max() - data.min())
-        return norm
+
+        return norm + 1
 
     def smooth(self, data, window_size):
         window = np.ones(window_size) / window_size

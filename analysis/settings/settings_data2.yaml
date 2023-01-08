@@ -6,18 +6,19 @@ meta_data_name: 'meta_data.yaml'
 
 auto_suffix: False
 circle_fitfrac: !!float 0.33333333
-cluster_fminsize: !!int 300
-f_dead: !!float 0.3
-f_weak: !!float 0.5
 vcor_px: !!int 0
 hcor_px: !!int 0
-init_x0x1: [60, 790]
-init_y0y1: [90, 150]
-x0y0x1y1: !!null None
+box_x0y0x1y1: [72,101,783,720]
+init_x0x1: !!null None
+init_y0y1: !!null None
+box_param_x0y0x1y1: [855,68,959,307]
 signal_thresh: !!float 0
 curve_radii_px: !!null None
 curve_origin_px: !!null None
 curve_angles_deg: !!null None
-crop_depth: !!int 100
+crop_depth: !!int 50
 window: !!int 5
-normalize_mode: 'normal'
+normalize_mode: 'mean'
+dcm_us_sequence: '0018, 6011'
+remove_small_clusers: False
+num_reverb_lines: !!int 3

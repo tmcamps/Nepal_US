@@ -18,7 +18,7 @@ class initialize_data:
         self.path_image = ""
 
         # Create dictionary for dicom meta data parameters
-        self.meta_data = {}
+        #self.meta_data = {}
 
         # label to add to results
         self.label = ""
@@ -76,45 +76,52 @@ class initialize_data:
         # Clean up dictionairy
         clean = {k.replace('\t', ''): v for k, v in temp.items()}
 
-        # Change data type of dictionary values
-        meta_data = {}
-        for key, value in clean.items():
-            try:
-                meta_data[key] = int(value)
-            except:
-                meta_data[key] = value
+        params = self.params
 
-        self.meta_data = meta_data
+        # Change data type of dictionary values
+        for key, value in clean.items():
+            current_val = list(params.values())
+            current_key = list(params.keys())
+
+            if key in current_val:
+                try:
+                    key_cur = current_key[current_val.index(key)]
+                    params[key_cur] = int(value)
+                except:
+                    key_cur = current_key[current_val.index(key)]
+                    params[key_cur] = value
+
+        self.params = params
+
 
     def extract_metadata_dcm(self):
         ''' This function extract metadata information on the dicom and outputs to dictionary '''
 
         dct_metadata = self.dct_metadata
         data = self.data
-        seq = data[0x0018, 0x6011]
-        data_sub = seq[0]
+        seq_tag = self.params['dcm_us_sequence']
+        seq_tag = pydicom.tag.Tag(seq_tag.split(',')[0], seq_tag.split(',')[1])
+        data_sub = data[seq_tag][0]
 
-        meta_data = {}
-
-        for key in dct_metadata.keys():
+        for key, val in dct_metadata.items():
 
             try:
-                meta_data[key] = data[dct_metadata[key]].value
+                tag_val = pydicom.tag.Tag(val.split(',')[0], val.split(',')[1])
+                self.params[key] = data[tag_val].value
             except:
-                meta_data[key] = data_sub[dct_metadata[key]].value
-
-        self.meta_data = meta_data
+                tag_val = pydicom.tag.Tag(val.split(',')[0], val.split(',')[1])
+                self.params[key] = data_sub[tag_val].value
 
     def set_label_bmp(self):
-        transducer_type = self.meta_data[self.params['transducer_type']]
+        transducer_type = self.params['transducer_type']
         date = self.folder[0:8]
         number = self.folder[14:18]
 
         self.label = transducer_type + '-' + date + '-' + number + '-'
 
     def set_label_dcm(self):
-        transducer_type = self.meta_data['transducer_type']
-        date = self.meta_data['date']
+        transducer_type = self.params['transducer_type']
+        date = self.params['date']
 
         self.label = transducer_type + '-' + date + '-'
 

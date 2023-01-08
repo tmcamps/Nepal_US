@@ -2,14 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 from PIL import ImageDraw
+import matplotlib as mpl
 
 class visualizations:
     def penetration_visualization(self, qc, im):
 
         # Set up parameters
         profile = qc.vert_profile_smooth
+        error = qc.error_ver
         depth_px = np.array(list(range(len(profile))))
         peaks_idx = qc.peaks_idx
+        num_reverb_lines = qc.params['num_reverb_lines']
         im = np.transpose(im, (1,0))
 
         ymax = np.max(profile) + 0.05
@@ -17,6 +20,7 @@ class visualizations:
 
         # Set up figure
         fig = plt.figure(dpi=1200)
+        fig.suptitle(qc.label + 'DOP', fontsize=10)
 
         # Set up axis; ax0 for image and ax1 for the horizontal profile
         ax0 = plt.axes([0.10, 0.75, 0.85, 0.20])
@@ -35,17 +39,31 @@ class visualizations:
         ax1.plot(depth_px, profile,
                  color='xkcd:slate blue',
                  label="Vertical intensity profile",
-                 zorder=-1)
-        ax1.scatter(peaks_idx[0:4], profile[peaks_idx[0:4]],
-                    marker='o',
-                    color='xkcd:pale red',
-                    label="Reverberation lines")
-        ax1.scatter(peaks_idx[-1], profile[peaks_idx[-1]],
-                    marker='x',
-                    color='xkcd:red orange',
-                    label="Fifth reverberation line")
+                 zorder=1)
+        ax1.fill_between(depth_px, profile+error, profile-error,
+                         color='gray',
+                         alpha=0.2)
+        if peaks_idx[0] == 0 and peaks_idx.shape[0] == 1:
+            ax1.plot([], [], ' ', label="No reverberation lines were found")
 
-        ax1.plot([], [], ' ', label="Depth = %.2f px" %peaks_idx[-1])
+        else:
+            ax1.scatter(peaks_idx[0:num_reverb_lines-1], profile[peaks_idx[0:num_reverb_lines-1]],
+                        marker='o',
+                        color='xkcd:pale red',
+                        label="Reverberation lines",
+                        zorder=-1)
+            ax1.scatter(peaks_idx[-1], profile[peaks_idx[-1]],
+                        marker='x',
+                        color='xkcd:red orange',
+                        label= 'Last reverberation line',
+                        zorder=-1)
+
+            # Plot peaks as line to indicate location in ultrasound image
+            ax1.vlines(x=peaks_idx, ymin=profile[peaks_idx], ymax=ymax,
+                       color='xkcd:slate blue',
+                       zorder=-1)
+
+            ax1.plot([], [], ' ', label="Depth = %.2f px" % peaks_idx[-1])
 
         # Set the x and y labels
         ax1.set_xlabel("position [px]")
@@ -71,15 +89,14 @@ class visualizations:
         weak = qc.weak
         dead = qc.dead
 
-        buckets = qc.buckets
         pixels10 = qc.pixels10
         pixels30 = qc.pixels30
 
-        ymax = np.max(profile) + 0.05
         xmax = np.max(width_px)
 
         # Set up figure
         fig = plt.figure(dpi=1200)
+        fig.suptitle(qc.label + 'uniformity', fontsize=10)
 
         # Set up axis; ax0 for image and ax1 for the horizontal profile
         ax0 = plt.axes([0.10, 0.75, 0.85, 0.20])
@@ -108,11 +125,24 @@ class visualizations:
                     color='xkcd:pale red',
                     label='dead elements',
                     s=10)
+
+        ax1.vlines(x=width_px[dead_idx], ymin=profile[dead_idx], ymax=2,
+                   color='xkcd:pale red',
+                   zorder=-1,
+                   alpha=0.6,
+                   linewidth=2)
+
         ax1.scatter(width_px[weak_idx], profile[weak_idx],
                     marker='o',
                     color='xkcd:pumpkin',
                     label='weak elements',
                     s=10)
+
+        ax1.vlines(x=width_px[weak_idx], ymin=profile[weak_idx], ymax=2,
+                   color='xkcd:pale red',
+                   zorder=-1,
+                   alpha=0.2,
+                   linewidth=0.4)
 
         # Show profile
         ax1.plot(width_px, profile,
@@ -141,7 +171,7 @@ class visualizations:
                    facecolor='black', alpha=0.1)  # Outer right 10-30 percent
 
         # Set x and y labels
-        ax1.set_ylim(bottom=0, top=ymax)
+        ax1.set_ylim(bottom=0, top=2)
         ax1.set_xlabel("position [px]")
         ax1.set_ylabel("signal [a.u.]")
         ax1.grid(False)
@@ -158,12 +188,11 @@ class visualizations:
         plt.close()
 
     def overview_plot(self, qc, im):
-
-
         # Set up figure
         fig = plt.figure(dpi=1200)
         fig.set_figwidth(10)
         fig.set_figheight(10)
+        fig.suptitle(qc.label + 'Report', fontsize=16)
 
         # Set up axis;
         ax0 = plt.axes([0.10, 0.55, 0.7, 0.4])  # image
@@ -179,11 +208,9 @@ class visualizations:
         weak = qc.weak
         dead = qc.dead
 
-        buckets = qc.buckets
         pixels10 = qc.pixels10
         pixels30 = qc.pixels30
 
-        ymax_hor = np.max(hori_profile) + 0.05
         xmax_hor = np.max(width_px)
 
         # Plot the weak and dead areas buckets
@@ -204,21 +231,29 @@ class visualizations:
                     color='xkcd:pale red',
                     label='dead elements',
                     s=10)
+        ax1.vlines(x=width_px[dead_idx], ymin=hori_profile[dead_idx], ymax=2,
+                   color='xkcd:pale red',
+                   zorder=-1,
+                   alpha=0.6,
+                   linewidth=2)
+
         ax1.scatter(width_px[weak_idx], hori_profile[weak_idx],
                     marker='o',
                     color='xkcd:pumpkin',
                     label='weak elements',
                     s=10)
 
+        ax1.vlines(x=width_px[weak_idx], ymin=hori_profile[weak_idx], ymax=2,
+                   color='xkcd:pale red',
+                   zorder=-1,
+                   alpha=0.2,
+                   linewidth=0.4)
+
         # Show profile
         ax1.plot(width_px, hori_profile,
                  color='xkcd:slate blue',
                  label="Horizontal intensity profile",
                  zorder=-1)
-
-        # Make the tick labels invisible of the image
-        plt.setp(ax0.get_xticklabels(), visible=False)
-        plt.setp(ax0.get_yticklabels(), visible=False)
 
         # Plot the weak, dead and mean limits and plot the buckets
         ax1.plot([width_px[0], width_px[-1]], [mean, mean],
@@ -237,7 +272,7 @@ class visualizations:
                     facecolor='black', alpha=0.1)  # Outer right 10-30 percent
 
         # Set x and y labels
-        ax1.set_ylim(bottom=0, top=ymax_hor)
+        ax1.set_ylim(bottom=0, top=2)
         ax1.set_xlabel("width [px]")
         ax1.set_ylabel("signal [a.u.]")
         ax1.grid(False)
@@ -249,28 +284,41 @@ class visualizations:
 
         '''2. Plot vertical profile'''
         # Set up parameters
+        x0, y0, x1, y1 = qc.params['reverb_depth']
         verti_profile = qc.vert_profile_smooth
         depth_px = np.array(list(range(len(verti_profile))))
         peaks_idx = qc.peaks_idx
+        num_reverb_lines = qc.params['num_reverb_lines']
 
         ymax_ver = np.max(verti_profile) + 0.05
-        xmax_ver = np.max(depth_px)
+        xmax_ver = y1-y0
 
         # Show profile below
         ax2.plot(verti_profile, depth_px,
                  color='xkcd:slate blue',
                  label="Vertical intensity profile",
-                 zorder=-1)
-        ax2.scatter(verti_profile[peaks_idx[0:4]], peaks_idx[0:4],
-                    marker='o',
-                    color='xkcd:pale red',
-                    label="Reverberation lines")
-        ax2.scatter(verti_profile[peaks_idx[-1]], peaks_idx[-1],
-                    marker='x',
-                    color='xkcd:red orange',
-                    label="Fifth reverberation line")
+                 zorder=1)
+        if peaks_idx[0] == 0 and peaks_idx.shape[0] == 1:
+            ax2.plot([], [], ' ', label="No reverberation lines were found")
 
-        ax2.plot([], [], ' ', label="Depth = %.2f px" % peaks_idx[-1])
+        else:
+            ax2.scatter(verti_profile[peaks_idx[0:num_reverb_lines-1]], peaks_idx[0:num_reverb_lines-1],
+                        marker='o',
+                        color='xkcd:pale red',
+                        label="Reverberation lines",
+                        zorder=-1)
+            ax2.scatter(verti_profile[peaks_idx[-1]], peaks_idx[-1],
+                        marker='x',
+                        color='xkcd:red orange',
+                        label="Last reverberation line",
+                        zorder=-1)
+
+            # Plot peaks as line to indicate location in ultrasound image
+            ax2.hlines(y=peaks_idx, xmin=0, xmax=verti_profile[peaks_idx],
+                       color='xkcd:slate blue',
+                       zorder=-1)
+
+            ax2.plot([], [], ' ', label="Depth = %.2f px" % peaks_idx[-1])
 
         # Set the x and y labels
         ax2.set_xlabel("signal [a.u.]")
@@ -293,6 +341,17 @@ class visualizations:
 
         # Offset for xlimit to see the first and last lines
         ax0.set_xlim(left=-xoffset, right=xmax_hor + xoffset)
+
+        '''Plot ultrasound parameters, if available'''
+        if qc.params['box_param_x0y0x1y1'] is not None:
+            ax3 = plt.axes([0.85, 0.2, 0.1, 0.2])  # vertical profile
+            x0, y0,x1,y1 = qc.params['box_param_x0y0x1y1']
+            ax3.imshow(qc.im[y0:y1,x0:x1], cmap='gray', aspect='auto')
+            ax3.grid(False)
+            ax3.axis('off')
+
+            plt.setp(ax3.get_xticklabels(), visible=False)
+            plt.setp(ax3.get_yticklabels(), visible=False)
 
         fig.savefig(f"{qc.path_save_overview}/{qc.label}overview.png", bbox_inches='tight')
         plt.close()
@@ -350,7 +409,7 @@ class visualizations:
                     roi.append((int(x + .5), int(y + .5)))
                 draw.polygon(roi, outline=0)
 
-        im.save(f"{qc.path_save_overview}/{qc.label}_ROI.png")
+        im.save(f"{qc.path_save_images}/{qc.label}_ROI.png")
 
 
 
