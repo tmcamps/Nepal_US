@@ -1,0 +1,22 @@
+# User settings for the ultrasound air image analysis:
+path_data: 'data\Z50\35C50EA'                                             # Directory location for analysis data
+path_save: 'results\Z50\35C50EA'                                          # Directory location for storing results
+file_name: !!null None
+
+circle_fitfrac: !!float 0.333333
+vcor_px: !!int 10
+hcor_px: !!int 0
+box_x0y0x1y1: [0,108,600,500]
+box_param_x0y0x1y1: [668,148,720,235]
+signal_thresh: !!float 0
+crop_depth: !!int 100
+window: !!int 5
+normalize_mode: !!null None
+remove_small_clusers: True
+num_reverb_lines: !!int 5
+peak_height: !!float 0.1
+peak_prominence: !!float .05
+
+# Meta_data variable names:
+transducer_type: '35C50EA'
+

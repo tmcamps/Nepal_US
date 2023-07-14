@@ -17,9 +17,6 @@ class initialize_data:
 
         self.path_image = ""
 
-        # Create dictionary for dicom meta data parameters
-        #self.meta_data = {}
-
         # label to add to results
         self.label = ""
 
@@ -40,14 +37,8 @@ class initialize_data:
         return dct
 
     def load_bmp(self):
-        folder = self.folder
-        filename = self.params['file_name']
-        path_image = os.path.join(self.analysis_root, self.params['path_data'], folder, filename)
-
-        self.path_image = path_image
-
         # load the image
-        image = Image.open(path_image).convert('L')
+        image = Image.open(self.path_image).convert('L')
 
         # convert image to numpy array
         data = asarray(image)
@@ -117,26 +108,47 @@ class initialize_data:
         date = self.folder[0:8]
         number = self.folder[14:18]
 
+
         self.label = transducer_type + '-' + date + '-' + number + '-'
+        self.date = date
 
     def set_label_dcm(self):
         transducer_type = self.params['transducer_type']
         date = self.params['date']
 
+
         self.label = transducer_type + '-' + date + '-'
+        self.date = date
 
     def run(self):
         self.params = self.open_yaml(self.settings_file)
 
-        if '.dcm' in self.params['file_name']:
+        if self.params['file_name'] is None:
+            self.params['file_name'] = self.folder
+            path_image = os.path.join(self.analysis_root, self.params['path_data'], self.params['file_name'])
+
+            self.path_image = path_image
+
+            self.load_bmp()
+            self.set_label_bmp()
+
+        elif '.dcm' in self.params['file_name']:
             self.dct_metadata = self.open_yaml(self.params['meta_data_name'], type='meta_data')
 
             self.load_dcm()
             self.extract_metadata_dcm()
             self.set_label_dcm()
 
-        elif '.bmp':
+        elif '.bmp' in self.params['file_name']:
+            # Set up path for image
+            folder = self.folder
+            filename = self.params['file_name']
+            path_image = os.path.join(self.analysis_root, self.params['path_data'], folder, filename)
+
+            self.path_image = path_image
+
             self.load_bmp()
             self.extract_metadata_bmp()
             self.set_label_bmp()
+
 

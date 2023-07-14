@@ -148,7 +148,7 @@ class analysis_helper:
         """
         Function to normalize data
         """
-        return (data - data.min())/ (data.max() - data.min())
+        return (data - data.min())/(data.max())
 
     def normalize_mean(self, data):
         """

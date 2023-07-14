@@ -6,10 +6,8 @@ import operator
 from scipy.signal import find_peaks
 import warnings
 
-from analysis.utilizations import fit_circle, initialize_data, util_analysis, visualizations, export_results
-
-# import importlib
-# importlib.reload(initialize_data)
+from analysis.utilizations import fit_circle, initialize_data, util_analysis, visualizations
+from export_results import save_to_excel
 
 helper = util_analysis.analysis_helper()
 visualize = visualizations.visualizations()
@@ -24,6 +22,7 @@ class analysis:
 
         self.params = init.params
         self.label = init.label
+        self.date = init.date
         self.im = init.im
 
         if self.params['box_x0y0x1y1']:
@@ -38,6 +37,7 @@ class analysis:
 
         # Set path for saving data
         self.path = init.analysis_root
+        self.path_save_results = os.path.join(self.path, 'results')
         self.path_save_overview = os.path.join(self.path, self.params['path_save'])
         self.path_save_images = os.path.join(self.path, self.params['path_save'], self.label)
         os.makedirs(self.path_save_images, exist_ok=True)
@@ -67,18 +67,7 @@ class analysis:
         mask = mask.astype('bool')
         mask[y0:y1,x0:x1] = True
 
-        # '''Optional: remove color bars from sides if initial values are provided'''
-        # if not self.params['init_x0x1'] is None:
-        #     x0,x1 = self.params['init_x0x1']        # Provided initial box
-        #     mask[:,:x0] = False                     # Select box from image
-        #     mask[:,x1+1:] = False
-        #
-        # if not self.params['init_y0y1'] is None:
-        #     y0,y1 = self.params['init_y0y1']        # Provided initial box
-        #     mask[:y0,:] = False                     # Select box from image
-        #     mask[y1+1:,:] = False
-
-        '''Remove possible small clusters present in mask; also possible to do after is_curved determination'''
+        '''Remove possible small clusters present in mask;'''
         if self.params['remove_small_clusers']:
             im_region = image*mask
             signal_thresh = self.params['signal_thresh']
@@ -96,22 +85,22 @@ class analysis:
 
         '''Save upper and lower edges of the reverberation pattern'''
         # Create list with indices of the cluster representing the reverberation pattern
-        # clus = np.where(mask)
-        # clus = [(x, y) for x, y in zip(clus[0], clus[1])]
-        #
-        # # Determine upper and lower edges of the cluster
-        # minx = min(clus, key=operator.itemgetter(1))[1]
-        # maxx = max(clus, key=operator.itemgetter(1))[1]
-        # maxy = max(clus, key=operator.itemgetter(0))[0]
-        # miny = min(clus, key=operator.itemgetter(0))[0]
+        clus = np.where(mask)
+        clus = [(x, y) for x, y in zip(clus[0], clus[1])]
+
+        # Determine upper and lower edges of the cluster
+        minx = min(clus, key=operator.itemgetter(1))[1]
+        maxx = max(clus, key=operator.itemgetter(1))[1]
+        maxy = max(clus, key=operator.itemgetter(0))[0]
+        miny = min(clus, key=operator.itemgetter(0))[0]
 
         # Save upper and lower edges
-        self.params['us_x0y0x1y1'] = [x0, y0, x1, y1]
+        self.params['us_x0y0x1y1'] = [minx, miny, maxx, maxy]
 
-        self.report[report_section]['us_box_xmin_px'] = ('int', x0)
-        self.report[report_section]['us_box_ymin_px'] = ('int', y0)
-        self.report[report_section]['tus_box_xmax_px'] = ('int', x1)
-        self.report[report_section]['us_box_ymax_px'] = ('int', y1)
+        self.report[report_section]['us_box_xmin_px'] = ('int', minx)
+        self.report[report_section]['us_box_ymin_px'] = ('int', miny)
+        self.report[report_section]['us_box_xmax_px'] = ('int', maxx)
+        self.report[report_section]['us_box_ymax_px'] = ('int', maxy)
 
         return mask
 
@@ -233,7 +222,7 @@ class analysis:
         # Define vector containing all radii values between circle radius and maximum radius value
         radii = np.linspace(R, max_R, int(0.5 + max_R - R))
 
-        # Create Cartesian matrix from coordinate vectors (angles & radii)
+        # Create Polar  matrix from coordinate vectors (angles & radii)
         an, ra = np.meshgrid(angles, radii)
 
         '''3. Transform image to linear by interpolation'''
@@ -311,8 +300,10 @@ class analysis:
         self.vert_profile = vertical_profile
         self.error_ver = error
 
-        self.report[report_section]['peaks_idx'] = peaks
-        self.report[report_section]['peak_depth_px'] = depth_px
+        for i in range(len(peaks)):
+            self.report[report_section]['peaks_id_{}'.format(i)] = ('int', peaks[i])
+
+        self.report[report_section]['peak_depth_px'] = ('int', depth_px)
 
     def isolate_reverberation(self, edges, data):
         x0, y0, x1, y1 = edges
@@ -378,8 +369,13 @@ class analysis:
             horizontal_profile = horizontal_profile
 
         '''2. Define threshold for weak and dead elements, and calculate line profiles for weak, dead and mean'''
-        mean = np.average(horizontal_profile)
-        MAD = np.mean(np.absolute(horizontal_profile - np.mean(horizontal_profile)))
+        # mean = np.average(horizontal_profile)
+        # MAD = np.mean(np.absolute(horizontal_profile - np.mean(horizontal_profile)))
+        # weak = mean-2*MAD
+        # dead = mean-3*MAD
+
+        mean = np.median(horizontal_profile)
+        MAD = np.median(np.absolute(horizontal_profile - np.median(horizontal_profile)))
         weak = mean-2*MAD
         dead = mean-3*MAD
 
@@ -444,10 +440,6 @@ class analysis:
 
         '''Step 1: Isolate the ultrasound data as mask'''
         self.us_mask = self.isolate_us_image()
-        # im_mask = self.us_mask.astype('int')
-        # im_mask[np.where(im_mask==1)] = 255
-        # im_save = Image.fromarray(im_mask)
-        # im_save.save(f"{self.path_save_images}/{self.label}mask.png")
 
         '''Step 2: Perform depth of penetration analysis'''
         # Step 2a: Define the edges of the analysed ultrasound image and create masked image
@@ -479,7 +471,7 @@ class analysis:
         self.depth_of_penetration(image_center_crop)
 
         # Step 2f: Create visualization of depth of penetration
-        visualize.penetration_visualization(self, image_p)
+        visualize.penetration_visualization(self, image_center_crop)
 
         '''Step 3: Perform uniformity analysis'''
         # Step 3a: Isolate reverberation pattern by cropping depth of the image
@@ -498,7 +490,7 @@ class analysis:
         '''Step 4: Create final report of the analysis'''
         visualize.overview_plot(self, image_u)
         visualize.draw_ROI(self, self.im)
-        #export_results.export_results(self)
+        save_to_excel(self)
 
         self.image_u = image_u
         self.image_p = image_p

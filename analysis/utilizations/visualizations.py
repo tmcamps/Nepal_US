@@ -93,6 +93,7 @@ class visualizations:
         pixels30 = qc.pixels30
 
         xmax = np.max(width_px)
+        ymax = np.max(profile)
 
         # Set up figure
         fig = plt.figure(dpi=1200)
@@ -112,7 +113,7 @@ class visualizations:
                    facecolor='xkcd:pale red', alpha=0.2)  # Dead area
         ax1.axhspan(dead, weak,
                    facecolor='xkcd:pumpkin', alpha=0.2)  # Weak area
-        ax1.axhspan(weak, 1,
+        ax1.axhspan(weak, ymax,
                     facecolor='xkcd:dull green', alpha=0.2)  # remaining area
 
         # Extract weak and dead indices
@@ -126,7 +127,7 @@ class visualizations:
                     label='dead elements',
                     s=10)
 
-        ax1.vlines(x=width_px[dead_idx], ymin=profile[dead_idx], ymax=2,
+        ax1.vlines(x=width_px[dead_idx], ymin=profile[dead_idx], ymax=ymax,
                    color='xkcd:pale red',
                    zorder=-1,
                    alpha=0.6,
@@ -138,7 +139,7 @@ class visualizations:
                     label='weak elements',
                     s=10)
 
-        ax1.vlines(x=width_px[weak_idx], ymin=profile[weak_idx], ymax=2,
+        ax1.vlines(x=width_px[weak_idx], ymin=profile[weak_idx], ymax=ymax,
                    color='xkcd:pale red',
                    zorder=-1,
                    alpha=0.2,
@@ -175,7 +176,7 @@ class visualizations:
         ax1.set_xlabel("position [px]")
         ax1.set_ylabel("signal [a.u.]")
         ax1.grid(False)
-        ax1.legend(loc='upper right')
+        ax1.legend(loc='lower right')
 
         # Offset for xlimit to see the first and last lines
         xoffset = 5
@@ -199,6 +200,10 @@ class visualizations:
         ax1 = plt.axes([0.10, 0.1, 0.7, 0.45])  # horizontal profile
         ax2 = plt.axes([0.8, 0.55, 0.2, 0.4])  # vertical profile
 
+        # ax0 = plt.axes([0.10, 0.65, 0.7, 0.3])  # image
+        # ax1 = plt.axes([0.10, 0.1, 0.7, 0.55])  # horizontal profile
+        # ax2 = plt.axes([0.8, 0.65, 0.2, 0.3])  # vertical profile
+
         '''1. Plot horizontal profile'''
         # Set up parameters
         hori_profile = qc.hori_profile
@@ -212,13 +217,14 @@ class visualizations:
         pixels30 = qc.pixels30
 
         xmax_hor = np.max(width_px)
+        ymax_hor = np.max(hori_profile)
 
         # Plot the weak and dead areas buckets
         ax1.axhspan(0, dead,
                     facecolor='xkcd:pale red', alpha=0.2)  # Dead area
         ax1.axhspan(dead, weak,
                     facecolor='xkcd:pumpkin', alpha=0.2)  # Weak area
-        ax1.axhspan(weak, 1,
+        ax1.axhspan(weak, ymax_hor,
                     facecolor='xkcd:dull green', alpha=0.2)  # remaining area
 
         # Extract weak and dead indices
@@ -231,7 +237,7 @@ class visualizations:
                     color='xkcd:pale red',
                     label='dead elements',
                     s=10)
-        ax1.vlines(x=width_px[dead_idx], ymin=hori_profile[dead_idx], ymax=2,
+        ax1.vlines(x=width_px[dead_idx], ymin=hori_profile[dead_idx], ymax=ymax_hor,
                    color='xkcd:pale red',
                    zorder=-1,
                    alpha=0.6,
@@ -243,7 +249,7 @@ class visualizations:
                     label='weak elements',
                     s=10)
 
-        ax1.vlines(x=width_px[weak_idx], ymin=hori_profile[weak_idx], ymax=2,
+        ax1.vlines(x=width_px[weak_idx], ymin=hori_profile[weak_idx], ymax=ymax_hor,
                    color='xkcd:pale red',
                    zorder=-1,
                    alpha=0.2,
@@ -272,11 +278,11 @@ class visualizations:
                     facecolor='black', alpha=0.1)  # Outer right 10-30 percent
 
         # Set x and y labels
-        ax1.set_ylim(bottom=0, top=2)
+        ax1.set_ylim(bottom=0, top=ymax_hor)
         ax1.set_xlabel("width [px]")
         ax1.set_ylabel("signal [a.u.]")
         ax1.grid(False)
-        ax1.legend(loc='upper right', fontsize='small')
+        ax1.legend(loc='lower right', fontsize='small')
 
         # Offset for xlimit to see the first and last lines
         xoffset = 5
@@ -324,7 +330,7 @@ class visualizations:
         ax2.set_xlabel("signal [a.u.]")
         ax2.yaxis.tick_right()
         ax2.grid(False)
-        ax2.legend(fontsize='small', loc='lower center')
+        ax2.legend(loc='lower center')
 
         # Set limits for x and yaxis
         ax2.set_ylim(bottom=xmax_ver, top=0)

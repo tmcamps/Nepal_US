@@ -1,6 +1,6 @@
 # User settings for the ultrasound air image analysis:
-path_data: 'data'                                             # Directory location for analysis data
-path_save: 'results'                                          # Directory location for storing results
+path_data: 'data\DC40\C6-2'                                             # Directory location for analysis data
+path_save: 'results\DC40\C6-2'                                          # Directory location for storing results
 file_name: 'thumbnail.bmp'
 meta_data_name: 'DcmRegionPara.txt'
 
@@ -13,14 +13,13 @@ box_param_x0y0x1y1: [1110,147,1300,322]
 init_x0x1: !!null None
 init_y0y1: !!null None
 signal_thresh: !!float 0
-curve_radii_px: !!null None
-curve_origin_px: !!null None
-curve_angles_deg: !!null None
 crop_depth: !!int 100
-window: !!int 5
-normalize_mode: 'mean'
+window: !!int 7
+normalize_mode: !!null None
 remove_small_clusers: True
 num_reverb_lines: !!int 5
+peak_height: !!float 0.1
+peak_prominence: !!float .05
 
 # Meta_data variable names:
 transducer_type: 'strProbeName'
