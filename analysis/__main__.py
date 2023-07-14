@@ -1,55 +1,36 @@
-''' Import packages '''
+''' Import packages and functions '''
+from analysis.reverberation_analysis.air_reverberation_analysis import analysis
 import os
-import yaml
-
-from analysis.Reverberation_analysis.main_image_analysis import main_analysis_original, main_analysis_new
-from utils import extract_parameters
-import pydicom
-#%%
-''' Initialize values '''
-path = os.getcwd()                                                      # Get the current working directory of a process
-settings_file = 'settings_data2.yaml'  # Name of file with preset settings
-path_settings = os.path.join(path, settings_file)                       # Get directory of settings file
-settings_dct = yaml.load(open(path_settings), Loader=yaml.FullLoader)   # Load user settings from yaml file as dictionary
-
-path_data = os.path.join(path, settings_dct['path_data'])               # Load directory for data
-path_save = os.path.join(path, settings_dct['path_save'])               # Load directory for results
-log_filename = settings_dct['log_filename']                             # Load file name for log file
-path_LUT_table = os.path.join(path, settings_dct['file_LUT_table'])     # Load directory of LUT table
-
+from get_project_root import root_path
 
 #%%
-''' Run image data analysis '''
-filenames = os.listdir(path_data)
-data = os.path.join(path_data, filenames[0])
-# dcm_data = pydicom.dcmread(data, force=True)
-# im = dcm_data.pixel_array
+''' Initialize values for all folders run '''
+project_root = root_path(ignore_cwd=True)
+data_directory = os.path.join(project_root, 'analysis', 'data')
+devices = ['Z50', 'DC40']
 
-results1 = main_analysis_original(data, path_LUT_table)
+# Loop through device folders
+for device in devices:
+    # Select specific device directory
+    device_directory = os.path.join(data_directory, device)
 
-#%%
-report = main_analysis_new(data)
+    # Loop through probe folder in device folder
+    for probe in os.listdir(device_directory):
+        probe = os.fsdecode(probe)
 
-#%%
-''' Load data '''
-filenames = os.listdir(path_data)
+        # Select specific probe directory
+        probe_directory = os.path.join(device_directory, probe)
 
-for filename in filenames:                                              # Loop through dicom data files and add metadata to table
+        settings = 'settings_' + probe + '.yaml'
 
-    data = pydicom.dcmread(os.path.join(path_data, filename))           # Read dicom data
-    dct_params = extract_parameters(data, get_name=False)               # Extract parameters of metadata
-    #
-    # df1 = pd.DataFrame(data=dct_params)                                 # Create dataframe using parameters
-    # try:
-    #     df = pd.read_excel(path_LUT_table)                                # Read excel reader
-    # except:
-    #     df = pd.DataFrame({})
-    # try:
-    #     df.drop(['Unnamed: 0'], axis=1, inplace=True)
-    # except:
-    #     None
-    #
-    # frames = [df, df1]
-    # df_total = pd.concat(frames)
-    # df_total.to_excel(path_LUT_table)
+        # Loop through image folders in probe folder
+        for folder in os.listdir(probe_directory):
+            folder = os.fsdecode(folder)
+
+            # Initialize quality assurance function
+            qc = analysis(settings, folder)
+
+            # Run quality assurance for the specific image
+            qc.run()
+
 

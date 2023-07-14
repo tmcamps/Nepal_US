@@ -2,87 +2,88 @@ import os
 import numpy as np
 import scipy.ndimage as scind
 from PIL import Image
-from PIL import ImageDraw # imagedraw from pillow is needed, not pil
 import operator
-import matplotlib.pyplot as plt
-from openpyxl import Workbook, load_workbook
-from scipy import stats
-from sklearn import preprocessing
-from scipy.signal import argrelextrema
 from scipy.signal import find_peaks
+import warnings
 
-from utils_analysis_new import fit_circle, initialize_data, analysis_helper, visualizations
-helper = analysis_helper()
-visualize = visualizations()
+from analysis.utilizations import fit_circle, initialize_data, util_analysis, visualizations
+from export_results import save_to_excel
+
+helper = util_analysis.analysis_helper()
+visualize = visualizations.visualizations()
 
 
 class analysis:
-    def __init__(self, settings, metadata):
+    def __init__(self, settings, folder):
 
         # Step 1: initialize data and dictionary
-        init = initialize_data(settings, metadata)
+        init = initialize_data.initialize_data(settings, folder)
         init.run()
 
-        self.meta_data = init.meta_data
         self.params = init.params
         self.label = init.label
+        self.date = init.date
         self.im = init.im
+
+        if self.params['box_x0y0x1y1']:
+            self.params['init_us_x0y0x1y1'] = self.params['box_x0y0x1y1']
+
+        elif self.params['x0'] and self.params['x1'] and self.params['y0'] and self.params['y1']:
+            self.params['init_us_x0y0x1y1'] = self.params['x0'], self.params['y0'], self.params['x1'], self.params['y1']
+
+        else:
+            raise Exception("No initial box for the region is defined, please add the variable box_x0y0x1y1 to settings file")
+
 
         # Set path for saving data
         self.path = init.analysis_root
-        self.path_save_excel = os.path.join(self.path, self.params['path_save'])
+        self.path_save_results = os.path.join(self.path, 'results')
+        self.path_save_overview = os.path.join(self.path, self.params['path_save'])
         self.path_save_images = os.path.join(self.path, self.params['path_save'], self.label)
-        os.makedirs(self.path_save_images, exist_ok = True)
-
+        os.makedirs(self.path_save_images, exist_ok=True)
         # Create dictionary for results report
         self.report = {}
 
         # Create variables for analysis
-        self.mask_rev = None
         self.is_curved = False
 
     def isolate_us_image(self):
         """
-        Create mask containing only the ultrasound image data
+        Create image containing only the ultrasound image data
+
         """
 
         # Initialize report section for mask
         report_section = 'us_image'
         self.report[report_section] = {}
 
-        # Initialize variables
-        signal_thresh = self.params['signal_thresh']
+        # Initialize tissue region locations
+        x0,y0,x1,y1 = self.params['init_us_x0y0x1y1']
+
         image = self.im
 
-        '''1. Create binary image with provided signal threshold'''
-        BW = image > signal_thresh
+        # Create mask with values inside region parameters are set to True
+        mask = np.zeros(image.shape)
+        mask = mask.astype('bool')
+        mask[y0:y1,x0:x1] = True
 
-        '''2. Find ultrasound data as largest connected component'''
-        # Determine components and their labels
-        cca, labels = scind.label(BW)
+        '''Remove possible small clusters present in mask;'''
+        if self.params['remove_small_clusers']:
+            im_region = image*mask
+            signal_thresh = self.params['signal_thresh']
 
-        # Remove small clusters
-        cca_new, labels_new = helper.remove_small_cluster(cca, labels, BW, self)
+            # Create binary image
+            BW = im_region > signal_thresh
 
-        # Search for clusters present in the vertical middle
-        labels_middle = helper.select_vertical_middle(cca_new)
+            # Create mask only containing largest component, the ultrasound region
+            mask = helper.remove_small_cluster(BW)
 
-        ''' 3. Create mask containing only clusters larger than minimum size and present in vertical middle'''
-        mask = np.reshape(np.in1d(cca_new, labels_middle), np.shape(cca_new))
-
-        '''4. Delete color bars from sides if initial values are provided'''
-        if not self.params['init_x0x1'] is None:
-            x0,x1 = self.params['init_x0x1']        # Provided initial box
-            mask[:,:x0] = False                     # Select box from image
-            mask[:,x1+1:] = False
-
-        '''5. Save ultrasound image'''
+        '''Save ultrasound image'''
         us_image = image * mask
         us_image = Image.fromarray(us_image)
         us_image.save(f"{self.path_save_images}/{self.label}ultrasound_image.png")
 
-        '''6. Report results'''
-        # Save upper and lower edges of the reverberation pattern
+        '''Save upper and lower edges of the reverberation pattern'''
         # Create list with indices of the cluster representing the reverberation pattern
         clus = np.where(mask)
         clus = [(x, y) for x, y in zip(clus[0], clus[1])]
@@ -98,7 +99,7 @@ class analysis:
 
         self.report[report_section]['us_box_xmin_px'] = ('int', minx)
         self.report[report_section]['us_box_ymin_px'] = ('int', miny)
-        self.report[report_section]['tus_box_xmax_px'] = ('int', maxx)
+        self.report[report_section]['us_box_xmax_px'] = ('int', maxx)
         self.report[report_section]['us_box_ymax_px'] = ('int', maxy)
 
         return mask
@@ -161,7 +162,7 @@ class analysis:
 
         return is_curved
 
-    def curve_transform(self, im_segment, edges, mask):
+    def curve_transform(self, im_segment, edges):
         """
         Function to transform reverberation pattern to rectangle through interpolation at coords
 
@@ -186,7 +187,7 @@ class analysis:
         cf_fraction = circ_xy[int(fraction * len(circ_xy)):]  # Create circle of only central part
 
         # Fit the fractionated circle: calculate optimized center of circle and determine radius of the circle
-        cf = fit_circle(cf_fraction)
+        cf = fit_circle.fit_circle(cf_fraction)
         (x_center, y_center), R = cf.circ_fit()
 
         # Calculate the limiting curvature of the circle at left side and right side in rad
@@ -221,7 +222,7 @@ class analysis:
         # Define vector containing all radii values between circle radius and maximum radius value
         radii = np.linspace(R, max_R, int(0.5 + max_R - R))
 
-        # Create Cartesian matrix from coordinate vectors (angles & radii)
+        # Create Polar  matrix from coordinate vectors (angles & radii)
         an, ra = np.meshgrid(angles, radii)
 
         '''3. Transform image to linear by interpolation'''
@@ -234,6 +235,10 @@ class analysis:
 
         # Map the input array to new coordinates by interpolation.
         image_transform = scind.map_coordinates(im_segment, coordinates)
+
+        # If defined also crop a few pixels from the upper part of the image
+        dy = self.params['vcor_px']
+        image_transform = image_transform[dy:,:]
 
         return image_transform
 
@@ -258,50 +263,75 @@ class analysis:
         self.report[report_section] = {}
 
         '''1. Average in horizontal direction to create vertical profile'''
-        vertical_profile = np.average(data, axis=1)
-        vertical_profile = helper.normalize(vertical_profile)
+        data_norm = helper.normalize(data)
+        vertical_profile = np.mean(data_norm, axis=1)
+        error = np.std(data_norm, axis=1)
+
 
         '''2. Retrieve the reverberation line positions from the detrended vertical profile '''
         # Smoothen the profile to remove small peaks
-        window_size = 5
+        window_size = 3
         vertical_profile_smooth = helper.smooth(vertical_profile, window_size)
 
         # Find the peaks using the scipy.signal function 'find_peaks'
-        peaks = find_peaks(vertical_profile_smooth)
+        peaks = find_peaks(vertical_profile_smooth, height=.1, prominence=.05)
         peaks = peaks[0]
 
+        # Check if peaks are found
+        if peaks.shape[0] ==  0:
+            warnings.warn("Warning: no reverberation lines were found in the vertical intensity profile")
+            peaks = np.zeros(1, dtype=int)
+        else:
+            pass
+
         # Select only first 5 reverberation lines and determine depth of 5th reverberation line in pixels
-        peaks = peaks[0:5]
+        num_reverb_lines = self.params['num_reverb_lines']
+        peaks = peaks[0:num_reverb_lines]
         depth_px = peaks[-1]
 
-        # # Plot the vertical profile and the detected peaks
-        # x_values = np.array(list(range(len(vertical_profile_smooth))))
-        # plt.plot(x_values, vertical_profile_smooth)
-        # plt.scatter(peaks, vertical_profile_smooth[peaks])
-        # plt.show()
+        if peaks.shape[0] < num_reverb_lines:
+            warnings.warn("Warning: less reverberation lines found than target number of lines")
+
+        #@TODO: make a difference between linear and convex transducers in the number of reverberation lines to detect
 
         # Save and report the values
         self.peaks_idx = peaks
         self.vert_profile_smooth = vertical_profile_smooth
         self.vert_profile = vertical_profile
+        self.error_ver = error
 
-        self.report[report_section]['peaks_idx'] = peaks
-        self.report[report_section]['peak_depth_px'] = depth_px
+        for i in range(len(peaks)):
+            self.report[report_section]['peaks_id_{}'.format(i)] = ('int', peaks[i])
 
-    def isolate_reverberation(self, edges, data, depth_cor):
+        self.report[report_section]['peak_depth_px'] = ('int', depth_px)
+
+    def isolate_reverberation(self, edges, data):
         x0, y0, x1, y1 = edges
         image_us = data
         peaks = self.peaks_idx
 
-        # Determine depth of reverberation pattern to isolate
-        depth_pattern = peaks[-1] + depth_cor
+        if not self.params['crop_depth'] == 0:
+            crop_depth = self.params['crop_depth']
 
-        # Crop the image to the depth of the pattern
-        image_pattern = image_us[:depth_pattern, :]
+            # Determine depth of reverberation pattern to isolate
+            depth_pattern = int(peaks[-1] + crop_depth)
 
-        if self.is_curved == False:
-            # Save edges of transformed image
-            self.params['reverb_depth'] = x0, y0, x1, y0+depth_pattern
+            # Crop the image to the depth of the pattern
+            image_pattern = image_us[:depth_pattern, :]
+
+            y1 = y0+image_pattern.shape[0]
+
+        elif not self.params['hcor_px'] == 0:
+            hcor_px = self.params['hcor_px']
+            image_pattern = image_us[:, hcor_px:-hcor_px]
+
+            x0 = x0+hcor_px
+            x1 = x1-hcor_px
+
+        else:
+            image_pattern = image_us
+
+        self.params['reverb_depth'] = x0, y0, x1, y1
 
         #@TODO calculate depth of reverberation lines back to curved image
 
@@ -325,18 +355,29 @@ class analysis:
         self.report[report_section] = {}
 
         ''' 1. Average in vertical direction to create horizontal profile.'''
-        horizontal_profile = np.average(data, axis=0)
-        horizontal_profile = helper.normalize(horizontal_profile)
+        horizontal_profile = np.mean(data, axis=0)
+        if self.params['normalize_mode'] == 'normal':
+            horizontal_profile = helper.normalize(horizontal_profile)
+
+        elif self.params['normalize_mode'] == 'mean':
+            horizontal_profile = helper.normalize_mean(horizontal_profile)
+
+        elif self.params['normalize_mode'] == 'median':
+            horizontal_profile = helper.normalize_median(horizontal_profile)
+
+        elif self.params['normalize_mode'] is None:
+            horizontal_profile = horizontal_profile
 
         '''2. Define threshold for weak and dead elements, and calculate line profiles for weak, dead and mean'''
-        # Define threshold for weak and dead element values
-        weak = self.params['f_weak']
-        dead = self.params['f_dead']
+        # mean = np.average(horizontal_profile)
+        # MAD = np.mean(np.absolute(horizontal_profile - np.mean(horizontal_profile)))
+        # weak = mean-2*MAD
+        # dead = mean-3*MAD
 
-        # Create line profiles for mean, weak and dead
-        mean = np.average(horizontal_profile)
-        weak = weak * mean
-        dead = dead * mean
+        mean = np.median(horizontal_profile)
+        MAD = np.median(np.absolute(horizontal_profile - np.median(horizontal_profile)))
+        weak = mean-2*MAD
+        dead = mean-3*MAD
 
         '''3. Count the number of pixels with response below the weak threshold, and the dead threshold.'''
         # Find indices of pixels below the weak and dead thresholds
@@ -384,8 +425,8 @@ class analysis:
         self.report[report_section]['mean'] = ('float', mean)
         self.report[report_section]['relmin'] = ('float', np.min(horizontal_profile) / mean)
         self.report[report_section]['relmax'] = ('float', np.max(horizontal_profile) / mean)
-        self.report[report_section]['f_weak'] = ('float', self.params['f_weak'])
-        self.report[report_section]['f_dead'] = ('float', self.params['f_dead'])
+        self.report[report_section]['f_weak'] = ('float', weak)
+        self.report[report_section]['f_dead'] = ('float', dead)
 
         self.buckets = buckets
         self.hori_profile = horizontal_profile
@@ -395,19 +436,12 @@ class analysis:
         self.pixels10 = pixels10
         self.pixels30 = pixels30
 
-        # # Plot the vertical profile and the detected peaks
-        # x_values = np.array(list(range(len(horizontal_profile))))
-        # plt.plot(x_values, horizontal_profile)
-        # plt.show()
-
     def run(self):
 
         '''Step 1: Isolate the ultrasound data as mask'''
         self.us_mask = self.isolate_us_image()
 
         '''Step 2: Perform depth of penetration analysis'''
-        self.analysis_type = 'p'
-
         # Step 2a: Define the edges of the analysed ultrasound image and create masked image
         edges = self.params['us_x0y0x1y1']
         mask = self.us_mask
@@ -416,11 +450,11 @@ class analysis:
         # Step 2b: check if image is curved, and if so transform image
         self.is_curved = self.check_if_curved(mask, edges)
         if self.is_curved == True:
-            image_p = self.curve_transform(im_segment, edges, mask)
+            image_p = self.curve_transform(im_segment, edges)
 
         # Step 2c: crop image to a box only containing the reverberation pattern if data is not curved
         if self.is_curved == False:
-            image_p = helper.crop_image(im_segment, edges, mask)
+            image_p = helper.crop_image(im_segment, edges)
 
         # Create and save image of cropped rectangular image
         im_save = Image.fromarray(image_p)
@@ -437,14 +471,15 @@ class analysis:
         self.depth_of_penetration(image_center_crop)
 
         # Step 2f: Create visualization of depth of penetration
-        visualize.penetration_visualization(self, image_p)
+        visualize.penetration_visualization(self, image_center_crop)
 
         '''Step 3: Perform uniformity analysis'''
-        self.analysis_type = 'u'
+        # Step 3a: Isolate reverberation pattern by cropping depth of the image
+        image_u = self.isolate_reverberation(edges, image_p)
 
-        # Step 3a: Isolate reverberation pattern by taking five reverberation lines + 10 pixels; TO DO extract minima
-        depth_cor = 10 #pixels
-        image_u = self.isolate_reverberation(edges, image_p, depth_cor)
+        # Create and save image
+        im_save = Image.fromarray(image_u)
+        im_save.save(f"{self.path_save_images}/{self.label}image_uniformity.png")
 
         # Step 3b: analyse preprocessed data
         self.uniformity(image_u)
@@ -453,144 +488,10 @@ class analysis:
         visualize.uniformity_visualization(self, image_u)
 
         '''Step 4: Create final report of the analysis'''
+        visualize.overview_plot(self, image_u)
+        visualize.draw_ROI(self, self.im)
+        save_to_excel(self)
 
+        self.image_u = image_u
+        self.image_p = image_p
 
-#%%
-qc = analysis('settings_data2.yaml', 'meta_data.yaml')
-
-#%%
-qc.run()
-
-# #%%
-# profile = qc.hori_profile
-# # width_px = np.array(list(range(len(profile))))
-# #
-# # mean = qc.mean
-# # weak = qc.weak
-# dead = qc.dead
-#
-# dead_idx = sorted(np.where(profile < dead)[0])
-#
-# dead_idx = np.ma.masked_where(profile > dead, profile)
-# weak_idx = np.ma.masked_where((profile > weak), profile)
-# weak_idx = np.ma.masked_where((profile < dead), weak_idx)
-# normal_idx = np.ma.masked_where(profile < weak, profile)
-#
-# # Plot the profile
-# plt.figure()
-# plt.plot(width_px, weak_idx,
-#          color='red',
-#          label='dead elements')
-#
-# plt.show()
-# ax1.plot(width_px, weak_idx,
-#          color='orange',
-#          label='weak elements')
-# ax1.plot(width_px, normal_idx,
-#          color='green',
-#          label='functioning elements')
-
-#%%
-#
-# #%%
-# init = initialize_data('settings_data2.yaml', 'meta_data.yaml')
-# init.run()
-#
-# #%%
-# pal = np.arange(0, 256, 1, dtype=np.uint8)[:, np.newaxis] * \
-#       np.ones((3,), dtype=np.uint8)[np.newaxis, :]
-# # but reserve the first for red for markings
-# pal[0] = [255, 0, 0]
-#
-# temp = np.array(image)
-# temp[image == 0] = 1  # Set lowest value to 1
-# im = Image.fromarray(temp, mode='L')
-# im.putpalette(pal)
-#
-# #%%
-# polyrois = []
-# curve_roi = []
-# ang0, ang1 = qc.params['pt_curve_angles_deg'] #Rc, maxrad
-# r0, r1 = qc.params['pt_curve_radii_px']
-# xc, yc, rc = qc.params['pt_curve_origin_px']  # [xc,yc,Rc]
-#
-# #%%
-# x0, y0, x1, y1 = qc.params['us_x0y0x1y1']
-#
-# for ang in np.linspace(ang0, ang1, num=x1 - x0, endpoint=True):
-#     x = xc + r0 * np.sin(np.pi / 180. * ang)
-#     y = yc + r0 * np.cos(np.pi / 180. * ang)
-#     curve_roi.append((x, y))
-# for ang in np.linspace(ang1, ang0, num=x1 - x0, endpoint=True):
-#     x = xc + r1 * np.sin(np.pi / 180. * ang)
-#     y = yc + r1 * np.cos(np.pi / 180. * ang)
-#     curve_roi.append((x, y))
-# polyrois.append(curve_roi)
-#
-# #%%
-# draw = ImageDraw.Draw(im)
-# for r in polyrois:
-#     # [ [ (x,y) ] ]
-#     roi = []
-#     for x, y in r:
-#         roi.append((int(x + .5), int(y + .5)))
-#     draw.polygon(roi, outline=0)
-
-# #%%
-# rectrois = []
-# x0,y0,x1,y1 = qc.params['us_x0y0x1y1']
-# y1 = 59 + 5
-# x0 = 1
-# y0 = 1
-#
-# rectrois.append( [(x0, y0),(x1, y1)] )
-#
-# #%%
-# draw = ImageDraw.Draw(im)
-# for r in rectrois:
-#     # [ (x0,y0),(x1,y1) ]
-#     (x0, y0), (x1, y1) = r
-#     draw.rectangle(((x0, y0), (x1, y1)), outline=0)
-
-
-
-# init = initialize_data('settings_data1.yaml', 'meta_data.yaml')
-# init.run()
-# im, im_crop = qc.run()
-
-
-#%%
-# im_norm = helper.normalize(im_crop)
-# plt.figure()
-# plt.imshow(qc.im, cmap='gray', vmin=0, vmax=255)
-# plt.show()
-#
-# #%%
-# vertical_profile = np.average(im_norm, axis=1)
-# vertical_profile = helper.normalize(vertical_profile)
-#
-# window_size = 5
-# vertical_profile_smooth = helper.smooth(vertical_profile, window_size)
-# peaks = find_peaks(vertical_profile_smooth)
-# peaks = peaks[0]
-#
-# #%%
-# x_values = np.array(list(range(len(im))))
-# peak_line = np.zeros(peaks.)
-# for i in range(peaks.shape[0]):
-#     peak_lines[i] = np.ones(x.shape[0]) * peaks[i]
-# x_lines = np.concatenate()
-#
-# #%%
-# x_values = np.array(list(range(im.shape[1])))
-# peak_line = np.ones(x_values.shape[0]) * peaks[4]
-#
-# #%%
-# plt.imshow(im, cmap='gray', vmin=0, vmax=255)
-#
-# #%%
-# plt.plot(x_values, peak_line, 'r')
-#
-# #%%
-# plt.show()
-#
